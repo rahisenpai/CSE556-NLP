@@ -1,28 +1,26 @@
-#!/usr/bin/env python
-# coding: utf-8
 
-# ## Task 2 - Implement Word2vec 25 Marks
-# You are tasked with building a pipeline for training a Word2Vec model using the CBOW (Continuous Bag
-# of Words) approach FROM SCRATCH in PyTorch. It consist of the following components:
-# 
-# 1. You are required to create a Python class named Word2VecDataset that will serve as a custom dataset
-# for training the Word2Vec model. The implementaion should include the following components:
-# 
-#     - The custom implementation should work with PyTorch’s DataLoader to efficiently load the train-
-# ing data.. You can refer this guide [Tutorial] on creating custom dataset classes in PyTroch.
-# 
-#     - preprocess data - In this method, you will be preprocessing the provided corpus and prepare
-# the CBOW training data for training the Word2Vec model.
-# 
-#     - During preprocessing, you must use the WordPieceTokenizer implemented in Task 1 to tokenize
-# the input text corpus.
-# 
-# 2. You required to create a Python class named Word2VecModel which implement Word2Vec CBOW
-# architecture from scratch using PyTorch. After training the the model, save the trained model’s
-# checkpoint for later use.
-# 
-# 3. Develop a function named train to manage the entire training process of the Word2Vec model. This
-# function should include all the training logic.
+''' Task 2 - Implement Word2vec 25 Marks
+You are tasked with building a pipeline for training a Word2Vec model using the CBOW (Continuous Bag
+of Words) approach FROM SCRATCH in PyTorch. It consist of the following components:
+
+1. You are required to create a Python class named Word2VecDataset that will serve as a custom dataset
+for training the Word2Vec model. The implementaion should include the following components:
+
+    - The custom implementation should work with PyTorch’s DataLoader to efficiently load the train-
+ing data.. You can refer this guide [Tutorial] on creating custom dataset classes in PyTroch.
+
+    - preprocess data - In this method, you will be preprocessing the provided corpus and prepare
+the CBOW training data for training the Word2Vec model.
+
+    - During preprocessing, you must use the WordPieceTokenizer implemented in Task 1 to tokenize
+the input text corpus.
+
+2. You required to create a Python class named Word2VecModel which implement Word2Vec CBOW
+architecture from scratch using PyTorch. After training the the model, save the trained model’s
+checkpoint for later use.
+
+3. Develop a function named train to manage the entire training process of the Word2Vec model. This
+function should include all the training logic.'''
 
 
 import torch
@@ -39,23 +37,11 @@ import os
 
 from task1 import WordPieceTokenizer
 
-tokenizer = WordPieceTokenizer()
-
-
-# ## Word2VecDataset Class
-
-
-
-# Word2VecDataset(Dataset) => inherits from the Dataset class of Pytorch
+ 
+'''Word2VecDataset Class'''
 class Word2VecDataset(Dataset):
     
     def __init__(self, window_size, vocabulary_size):
-        
-        """
-        text : input corput as string
-        window size : defines how many words to take on either side as context
-        pad token : a special token used for padding in case of insufficient context
-        """
 
         self.pad_token = '[PAD]'
         self.window_size = window_size
@@ -65,17 +51,17 @@ class Word2VecDataset(Dataset):
         self.text = None
 
         # stores unique words in the corpus
-        self.vocabulary = None
+        self.vocabulary = set()
         # a dictionary mapping words to indices
-        self.word_to_idx = None
+        self.word_to_idx = {}
         # a dictionary mapping indices to words
-        self.idx_to_word = None
+        self.idx_to_word = {}
         # a list that will store training pairs
         self.cbow_pairs = []
         
         self.preprocess_data()
 
-    # uses Word Piece Tokenizer from Task 1 to tokenize input corpus
+    '''uses Word Piece Tokenizer from Task 1 to tokenize input corpus
     def tokenize_txt_file(self, input_file, output_file):
         
         with open(input_file, 'r', encoding='utf-8') as f:
@@ -91,12 +77,14 @@ class Word2VecDataset(Dataset):
         
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2)
+            
+    '''
 
     
-
+    '''updates vocabulary'''
     def update_vocabulary(self):
 
-        self.tokenizer.construct_vocabulary("corpus.txt", vocab_size=self.vocabulary_size)
+        self.tokenizer.construct_vocabulary("corpus.txt", vocabulary_size=self.vocabulary_size)
 
         vocabulary = []
 
@@ -113,30 +101,50 @@ class Word2VecDataset(Dataset):
     
     def tokenize_corpus(self):
         
-        self.tokenize_txt_file("corpus.txt", "task2-files/tokenized_corpus.json")
+        # get the tokenized corpus file using WordPieceTokenizer from task 1
+        input = "corpus.txt"
+        output = "task2-files/tokenized_corpus.json"
 
+        with open(input, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        results = {}
+        
+        for idx, line in enumerate(lines):
+            sentence = line.strip() 
+            tokens = self.tokenizer.tokenize(sentence)
+            results[str(idx)] = tokens 
+
+        
+        with open(output, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2)
+
+        # converting json tokenized corpus file to 2d array and updating dataset corpus
         corpus = None
 
         with open('task2-files/tokenized_corpus.json', 'r', encoding='utf-8') as f:
 
             tokenized_corpus = json.load(f)
-            # convert to list
+            # convert to list 2d
             corpus = [tokens for tokens in tokenized_corpus.values()]
             
         
         self.text = corpus
 
-
+    
+    '''function to generate cbow_pairs'''
     def generate_cbow_pairs(self):
 
         # looping over tokenized corpus
-        for sentence in self.text:
+        for line in self.text:
 
-            for j in range(len(sentence)):
+            for j in range(len(line)):
 
                 #context words
-                context_words = (sentence[max(0, j - self.window_size):j] + 
-                                sentence[j + 1:min(len(sentence), j + self.window_size + 1)])
+                start = max(0, j-self.window_size)
+                end = min(len(line), j + self.window_size + 1)
+
+                context_words = (line[start:j] + line[j + 1:end])
                 
                 
                 if len(context_words) > 0:
@@ -146,15 +154,21 @@ class Word2VecDataset(Dataset):
                         context_words.append(self.pad_token)
                     
                     # get indices for context words
-                    context_idxs = [self.word_to_idx.get(w, self.word_to_idx[self.pad_token]) for w in context_words]
+                    context_idxs = []
+
+                    for word in context_words:
+
+                        word_index = self.word_to_idx.get(word, self.word_to_idx[self.pad_token])
+                        context_idxs.append(word_index)
+
                     # get index for target word
-                    target_idx = self.word_to_idx.get(sentence[j], self.word_to_idx[self.pad_token])
+                    target_idx = self.word_to_idx.get(line[j], self.word_to_idx[self.pad_token])
                     
                     # store pair
                     self.cbow_pairs.append((context_idxs, target_idx))
 
 
-    # function to tokenize text, creates the vocabulary and generates CBOW training pairs
+    '''function to preprocess the data using above defined functions'''
     def preprocess_data(self):
 
         print("updating vocabulary")     
@@ -166,9 +180,20 @@ class Word2VecDataset(Dataset):
         print("updating mapping - word2idx and idx2word")
 
         # updates the word to index mapping
-        self.word_to_idx = {word: idx for idx, word in enumerate(self.vocabulary)}
+        # self.word_to_idx = {word: idx for idx, word in enumerate(self.vocabulary)}
+
+        # Create a dictionary that maps each word in the vocabulary to a unique index
+        self.word_to_idx = {}
+
+        for idx, word in enumerate(self.vocabulary):
+            self.word_to_idx[word] = idx
+
+        
         # updates the reverse index to word mapping
-        self.idx_to_word = {idx: word for word, idx in self.word_to_idx.items()}
+        self.idx_to_word = {}
+
+        for word, idx in self.word_to_idx.items():
+            self.idx_to_word[idx] = word
         
 
         print("generating cbow pairs")
@@ -193,37 +218,27 @@ class Word2VecDataset(Dataset):
 
 
 
-# ## Word2VecModel class
-
-
-
-# Word2VecModel(nn.Module) => Inherits from nn.Module class in Pytorch
+'''Word2VecModel'''
 class Word2VecModel(nn.Module):
 
-    def __init__(self, vocab_size, embedding_dim):
-        
-        '''
-        vocab size : the size of the vocabulary
-        embedding dimension : the number of features that represent each word
-        '''
+    def __init__(self, vocabulary_size, embedding_dim):
 
         super().__init__()
         
-        self.vocab_size = vocab_size
+        self.vocabulary_size = vocabulary_size
         self.embedding_dim = embedding_dim
         
-        # creates a special table that stores word representations for each word
-        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        # table that stores word representations for each word
+        self.embeddings = nn.Embedding(vocabulary_size, embedding_dim)
 
-        self.output_layer = nn.Linear(embedding_dim, vocab_size)
+        self.output_layer = nn.Linear(embedding_dim, vocabulary_size)
         
 
         self._initialize_weights()
     
-    # function to initialize weight
+    '''function to initialize weight'''
     def _initialize_weights(self):
         
-        # range of weights
         initrange = 0.5 / self.embedding_dim
         
         # initializing embedding layer
@@ -243,27 +258,29 @@ class Word2VecModel(nn.Module):
         x : input tensor, which represents the indices of the context words in the vocabulary. Its shape is [batch size, window size*2] -- [target word, [list of indexes of context words]]
         """
 
-        # will look up for embeddings for each word in context and output list of embeddings of each congext word
+        # embeddings for each word in context and output list of embeddings of each context word
         # size = [batch size, window size*2, embedding dimension]
         embedded = self.embeddings(x)
         
-        # calculates average of context words... horizontally - row by row
+        # calculating average of context words... horizontally - row by row
         # size = [batch_size, embedding_dim]
         context_embedding = torch.mean(embedded, dim=1)
         
         # passing the average context embedding to output layer
-        # output size vector = [batch_size, vocab_size]
+        # output size vector = [batch_size, vocabulary_size]
         output = self.output_layer(context_embedding)
 
         # returning after application of softmax function
         return F.log_softmax(output, dim=1)
 
     
-    # get embedding vector for a word
+    '''get embedding vector for a word'''
     def get_word_vector(self, word_idx):
 
         return self.embeddings.weight.data[word_idx]
     
+
+    '''function to get cosine similarity of between two vectors'''
     def cosine_similarity(self, word_idx1, word_idx2):
 
         vec1 = self.get_word_vector(word_idx1)
@@ -271,7 +288,9 @@ class Word2VecModel(nn.Module):
         
         return F.cosine_similarity(vec1.unsqueeze(0), vec2.unsqueeze(0)).item()
     
-    def find_most_similar(self, word_idx, top_k):
+
+    '''function to get the two most similar vectors to the given vector'''
+    def find_most_similar(self, word_idx):
 
         target_vector = self.get_word_vector(word_idx)
         
@@ -281,11 +300,16 @@ class Word2VecModel(nn.Module):
             self.embeddings.weight.data
         )
         
-        similarities[word_idx] = -1  # to exclude the word itself
-        top_scores, top_indices = similarities.topk(top_k)
+        # excluding the word itself
+        similarities[word_idx] = -1
+
+        # get the top two similar vectors
+        top_scores, top_indices = similarities.topk(2)
         
         return list(zip(top_indices.tolist(), top_scores.tolist()))
     
+    
+    '''function to get the least similar vector to the given vector'''
     def find_least_similar(self, word_idx):
  
         target_vector = self.get_word_vector(word_idx)
@@ -296,16 +320,110 @@ class Word2VecModel(nn.Module):
             self.embeddings.weight.data
         )
         
+        # excluding the word itself
+        similarities[word_idx] = 1
         
-        similarities[word_idx] = 1  # exclude the word itself
+        # get the least similar vector
         min_score, min_idx = similarities.min(dim=0)
         
         return (min_idx.item(), min_score.item())
 
 
-# ## Functions for saving and loading checkpoints
+
+'''Function to validate model after every accuracy
+returns - validation loss, validation accuracy and average cosine similarity'''
+
+def get_avg_cosine_similarity(cos_sim, predicted, target): 
+    # Calculate cosine similarity
+    # Get embeddings for predicted and target words
+    predicted_embeddings = model.embeddings(predicted)
+    target_embeddings = model.embeddings(target)
+            
+    # Calculate cosine similarity between predicted and target embeddings
+    batch_cosine_sim = cos_sim(predicted_embeddings, target_embeddings).mean()
+    total_cosine_sim += batch_cosine_sim.item()
+
+    return total_cosine_sim
+
+def validate_model(model, val_loader, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
+    
+    model.eval()
+    criterion = nn.NLLLoss()
+    total_loss = 0.0
+    total_correct = 0
+    total_samples = 0
+    total_cosine_sim = 0.0
+    num_batches = len(val_loader)
+    
+    # Cosine similarity function
+    cos_sim = nn.CosineSimilarity(dim=1)
+    
+    with torch.no_grad():
+        for context, target in val_loader:
+            context = context.to(device)
+            target = target.to(device)
+            
+            # Forward pass
+            output = model(context)
+            loss = criterion(output, target)
+            
+            # Calculate loss
+            total_loss += loss.item()
+            
+            # Calculate accuracy
+            predicted = output.argmax(dim=1)
+            total_correct += (predicted == target).sum().item()
+            total_samples += target.size(0)
+            
+            '''# Calculate cosine similarity
+            # Get embeddings for predicted and target words
+            predicted_embeddings = model.embeddings(predicted)
+            target_embeddings = model.embeddings(target)
+            
+            # Calculate cosine similarity between predicted and target embeddings
+            batch_cosine_sim = cos_sim(predicted_embeddings, target_embeddings).mean()
+            total_cosine_sim += batch_cosine_sim.item()'''
+
+            total_cosine_sim = get_avg_cosine_similarity(cos_sim, predicted, target)
+    
+    # Calculate average metrics
+    avg_loss = total_loss / num_batches
+    accuracy = (total_correct / total_samples) * 100
+    avg_cosine_sim = total_cosine_sim / num_batches
+    
+    return avg_loss, accuracy, avg_cosine_sim
 
 
+
+'''def evaluate_model(model, val_loader, device, dataset, BATCH_SIZE) :
+    model.eval()
+    
+    with torch.no_grad():
+        for i, (context, target) in enumerate(val_loader):
+            context = context.to(device)
+            target = target.to(device)
+            
+            # Get model prediction
+            output = model(context)
+            predicted_indices = output.argmax(dim=1)
+            
+            # Convert to words
+            for j in range(len(context)):
+                context_words = [dataset.idx_to_word[idx.item()] for idx in context[j]]
+                true_word = dataset.idx_to_word[target[j].item()]
+                predicted_word = dataset.idx_to_word[predicted_indices[j].item()]
+                
+                print(f"\nPair {i*BATCH_SIZE + j + 1}:")
+                print(f"Context: {context_words}")
+                print(f"True word: {true_word}")
+                print(f"Predicted: {predicted_word}")
+                print(f"Correct: {'✓' if true_word == predicted_word else '✗'}")
+            
+            # Print only first 5 validation pairs for brevity
+            if i >= 4:
+                print("\n... (showing first 20 pairs only)")
+                break
+'''
 
 def save_checkpoint(model, checkpoint_path, epoch, optimizer, loss, accuracy):
 
@@ -315,7 +433,7 @@ def save_checkpoint(model, checkpoint_path, epoch, optimizer, loss, accuracy):
         'optimizer_state_dict': optimizer.state_dict(),
         'loss': loss,
         'accuracy': accuracy,
-        'vocab_size': model.vocab_size,
+        'vocabulary_size': model.vocabulary_size,
         'embedding_dim': model.embedding_dim,
         'timestamp': datetime.now().isoformat()
     }
@@ -336,16 +454,15 @@ def load_checkpoint(model, checkpoint_path, device: str = 'cuda' if torch.cuda.i
         'epoch': checkpoint['epoch'],
         'loss': checkpoint['loss'], 
         'accuracy': checkpoint['accuracy'], 
-        'vocab_size': checkpoint['vocab_size'],
+        'vocabulary_size': checkpoint['vocabulary_size'],
         'embedding_dim': checkpoint['embedding_dim'],
         'timestamp': checkpoint['timestamp']
     }
 
 
-# ## Training Function
 
 
-
+'''training function'''
 def train_word2vec(model,train_loader,val_loader,num_epochs,learning_rate,
     checkpoint_dir = 'checkpoints',
     save_frequency = 5,
@@ -370,32 +487,47 @@ def train_word2vec(model,train_loader,val_loader,num_epochs,learning_rate,
     for epoch in range(num_epochs):
         # Compute decayed learning rate
         current_lr = learning_rate * (1 - epoch / num_epochs)
-        # current_lr = learning_rate
+   
         for param_group in optimizer.param_groups:
             param_group['lr'] = current_lr
         
+        # initializing these for tracking
         epoch_loss = 0.0
         epoch_correct = 0
         epoch_total = 0
         num_batches = len(train_loader)
         
+        # displaying progress bar
         progress_bar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}')
+
+        # setting the model to training mode
         model.train()
 
         for batch_idx, (context, target) in enumerate(progress_bar):
+
+            # moving data to the appropriate device
             context, target = context.to(device), target.to(device)
             optimizer.zero_grad()
+
+            # forward pass
             output = model.forward(context)
+
+            # calculating loss
             loss = criterion(output, target)
+
+            # backward pass
             loss.backward()
             optimizer.step()
             
+            # updating batch accuracy and loss
             predicted = output.argmax(dim=1)
             correct = (predicted == target).sum().item()
             total = target.size(0)
             
             batch_accuracy = (correct / total) * 100
             batch_loss = loss.item()
+
+            # updating tracking vars
             epoch_loss += batch_loss
             epoch_correct += correct
             epoch_total += total
@@ -436,8 +568,11 @@ def train_word2vec(model,train_loader,val_loader,num_epochs,learning_rate,
         
         # saving checkpoints
         if (epoch + 1) % save_frequency == 0:
+
             checkpoint_path = os.path.join(checkpoint_dir, f'word2vec_checkpoint_epoch_{epoch+1}.pt')
+
             save_checkpoint(model, checkpoint_path, epoch, optimizer, avg_epoch_loss, epoch_accuracy)
+
             print(f'Checkpoint saved: {checkpoint_path}')
     
     # saving final checkpoint
@@ -449,104 +584,18 @@ def train_word2vec(model,train_loader,val_loader,num_epochs,learning_rate,
     return history
 
 
-# ## Evaluation Functions
 
-
-
-def validate_model(model, val_loader, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
-    
-    model.eval()
-    criterion = nn.NLLLoss()
-    total_loss = 0.0
-    total_correct = 0
-    total_samples = 0
-    total_cosine_sim = 0.0
-    num_batches = len(val_loader)
-    
-    # Cosine similarity function
-    cos_sim = nn.CosineSimilarity(dim=1)
-    
-    with torch.no_grad():
-        for context, target in val_loader:
-            context = context.to(device)
-            target = target.to(device)
-            
-            # Forward pass
-            output = model(context)
-            loss = criterion(output, target)
-            
-            # Calculate loss
-            total_loss += loss.item()
-            
-            # Calculate accuracy
-            predicted = output.argmax(dim=1)
-            total_correct += (predicted == target).sum().item()
-            total_samples += target.size(0)
-            
-            # Calculate cosine similarity
-            # Get embeddings for predicted and target words
-            predicted_embeddings = model.embeddings(predicted)
-            target_embeddings = model.embeddings(target)
-            
-            # Calculate cosine similarity between predicted and target embeddings
-            batch_cosine_sim = cos_sim(predicted_embeddings, target_embeddings).mean()
-            total_cosine_sim += batch_cosine_sim.item()
-    
-    # Calculate average metrics
-    avg_loss = total_loss / num_batches
-    accuracy = (total_correct / total_samples) * 100
-    avg_cosine_sim = total_cosine_sim / num_batches
-    
-    return avg_loss, accuracy, avg_cosine_sim
-
-def evaluate_model(model, val_loader, device, dataset, BATCH_SIZE) :
-    model.eval()
-    
-    with torch.no_grad():
-        for i, (context, target) in enumerate(val_loader):
-            context = context.to(device)
-            target = target.to(device)
-            
-            # Get model prediction
-            output = model(context)
-            predicted_indices = output.argmax(dim=1)
-            
-            # Convert to words
-            for j in range(len(context)):
-                context_words = [dataset.idx_to_word[idx.item()] for idx in context[j]]
-                true_word = dataset.idx_to_word[target[j].item()]
-                predicted_word = dataset.idx_to_word[predicted_indices[j].item()]
-                
-                print(f"\nPair {i*BATCH_SIZE + j + 1}:")
-                print(f"Context: {context_words}")
-                print(f"True word: {true_word}")
-                print(f"Predicted: {predicted_word}")
-                print(f"Correct: {'✓' if true_word == predicted_word else '✗'}")
-            
-            # Print only first 5 validation pairs for brevity
-            if i >= 4:
-                print("\n... (showing first 20 pairs only)")
-                break
 
 def plot_training_history(history):
     
     fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(15, 5))
-    
-    # Plot loss
+
     ax1.plot(history['epoch_losses'], label='Training Loss')
     ax1.set_title('Training Loss Over Epochs')
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel('Loss')
     ax1.legend()
     ax1.grid(True)
-    
-    # # Plot accuracy
-    # ax2.plot(history['epoch_accuracies'], label='Training Accuracy', color='green')
-    # ax2.set_title('Training Accuracy Over Epochs')
-    # ax2.set_xlabel('Epoch')
-    # ax2.set_ylabel('Accuracy (%)')
-    # ax2.legend()
-    # ax2.grid(True)
 
     ax3.plot(history['val_losses'], label='Validation Loss')
     ax3.set_title('Validation Loss Over Epochs')
@@ -559,22 +608,20 @@ def plot_training_history(history):
     plt.show()
 
 
-# ## Saving Model
-
-
-
+'''function to save final model'''
 def save_model(final_model_dir, model, val_loss, accuracy):
     
     model_path = os.path.join(final_model_dir, 'final_model.pt')
     torch.save({
         'model_state_dict': model.state_dict(),
-        'vocab_size': model.vocab_size,
+        'vocabulary_size': model.vocabulary_size,
         'embedding_dim': model.embedding_dim,
         'val_loss': val_loss,
         'val_accuracy': accuracy
     }, model_path)
 
 
+'''function to save generated vocabulary'''
 def save_vocabulary(final_model_dir, dataset):  
 
     vocab_path = os.path.join(final_model_dir, 'vocabulary.json')
@@ -587,21 +634,16 @@ def save_vocabulary(final_model_dir, dataset):
 
 
 
-
-# ## Cosine Similarity Triplets Part
-
-
-
-# function to get triplets
+'''function to get triplets'''
 def find_triplets(model: Word2VecModel, num_triplets: int = 2):
     triplets = []
     
     for i in range(num_triplets):
         # randomly choose an initial word index
-        word_idx = torch.randint(0, model.vocab_size, (1,)).item()
+        word_idx = torch.randint(0, model.vocabulary_size, (1,)).item()
         
         # get most similar words
-        most_similar = model.find_most_similar(word_idx, top_k=2)
+        most_similar = model.find_most_similar(word_idx)
         
         # get the least similar word
         least_similar = model.find_least_similar(word_idx)
@@ -616,18 +658,18 @@ def find_triplets(model: Word2VecModel, num_triplets: int = 2):
 
 
 if __name__ == "__main__":
-    # ## Main Function
+   
     WINDOW_SIZE = 4
     EMBEDDING_DIM = 10
     BATCH_SIZE = 256
     NUM_EPOCHS = 15
     LEARNING_RATE = 0.02
     TRAIN_SPLIT = 0.8    
-    VOCAB_SIZE = 8500
+    vocabulary_size = 8500
 
     # Create dataset
     print("Creating dataset...")
-    dataset = Word2VecDataset(window_size=WINDOW_SIZE, vocabulary_size=VOCAB_SIZE)
+    dataset = Word2VecDataset(window_size=WINDOW_SIZE, vocabulary_size=vocabulary_size)
         
 
     # Split dataset into training and validation
@@ -652,7 +694,7 @@ if __name__ == "__main__":
     # model initialization
     print("Initializing model...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = Word2VecModel(vocab_size=len(dataset.vocabulary), embedding_dim=EMBEDDING_DIM).to(device)
+    model = Word2VecModel(vocabulary_size=len(dataset.vocabulary), embedding_dim=EMBEDDING_DIM).to(device)
         
 
     # training model
@@ -681,25 +723,26 @@ if __name__ == "__main__":
     plot_training_history(history)
         
 
-    # Print validation pairs and predictions
+    ''' # Print validation pairs and predictions
     print("\nValidation Pairs vs Predictions:")
     print("-" * 50)
 
-    evaluate_model(model, val_loader, device, dataset, BATCH_SIZE)
+    evaluate_model(model, val_loader, device, dataset, BATCH_SIZE)'''
         
 
-    # Save final model and vocabulary
-
+    # Save final model
     final_model_dir = 'task2-files/final_model'
-
     os.makedirs(final_model_dir, exist_ok=True)
-        
+
+
+    # save vocabulary  
     save_vocabulary(final_model_dir, dataset)
+    # save model
     save_model(final_model_dir, model, val_loss, accuracy)
 
 
 
-
+    # getting triplets
     triplets = find_triplets(model)
 
     print("Identified Triplets:")
