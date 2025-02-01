@@ -1,28 +1,3 @@
-
-''' Task 2 - Implement Word2vec 25 Marks
-You are tasked with building a pipeline for training a Word2Vec model using the CBOW (Continuous Bag
-of Words) approach FROM SCRATCH in PyTorch. It consist of the following components:
-
-1. You are required to create a Python class named Word2VecDataset that will serve as a custom dataset
-for training the Word2Vec model. The implementaion should include the following components:
-
-    - The custom implementation should work with PyTorch’s DataLoader to efficiently load the train-
-ing data.. You can refer this guide [Tutorial] on creating custom dataset classes in PyTroch.
-
-    - preprocess data - In this method, you will be preprocessing the provided corpus and prepare
-the CBOW training data for training the Word2Vec model.
-
-    - During preprocessing, you must use the WordPieceTokenizer implemented in Task 1 to tokenize
-the input text corpus.
-
-2. You required to create a Python class named Word2VecModel which implement Word2Vec CBOW
-architecture from scratch using PyTorch. After training the the model, save the trained model’s
-checkpoint for later use.
-
-3. Develop a function named train to manage the entire training process of the Word2Vec model. This
-function should include all the training logic.'''
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -84,7 +59,7 @@ class Word2VecDataset(Dataset):
     '''updates vocabulary'''
     def update_vocabulary(self):
 
-        self.tokenizer.construct_vocabulary("corpus.txt", vocabulary_size=self.vocabulary_size)
+        self.tokenizer.construct_vocabulary("corpus.txt", vocab_size=self.vocabulary_size)
 
         vocabulary = []
 
@@ -334,6 +309,7 @@ class Word2VecModel(nn.Module):
 returns - validation loss, validation accuracy and average cosine similarity'''
 
 def get_avg_cosine_similarity(cos_sim, predicted, target): 
+    total_cosine_sim = 0.0
     # Calculate cosine similarity
     # Get embeddings for predicted and target words
     predicted_embeddings = model.embeddings(predicted)
@@ -384,7 +360,7 @@ def validate_model(model, val_loader, device: str = 'cuda' if torch.cuda.is_avai
             batch_cosine_sim = cos_sim(predicted_embeddings, target_embeddings).mean()
             total_cosine_sim += batch_cosine_sim.item()'''
 
-            total_cosine_sim = get_avg_cosine_similarity(cos_sim, predicted, target)
+            total_cosine_sim += get_avg_cosine_similarity(cos_sim, predicted, target)
     
     # Calculate average metrics
     avg_loss = total_loss / num_batches
@@ -566,14 +542,14 @@ def train_word2vec(model,train_loader,val_loader,num_epochs,learning_rate,
         print(f"Cosine Similarity: {cosine_similarity}")
         
         
-        # saving checkpoints
+        '''# saving checkpoints
         if (epoch + 1) % save_frequency == 0:
 
             checkpoint_path = os.path.join(checkpoint_dir, f'word2vec_checkpoint_epoch_{epoch+1}.pt')
 
             save_checkpoint(model, checkpoint_path, epoch, optimizer, avg_epoch_loss, epoch_accuracy)
 
-            print(f'Checkpoint saved: {checkpoint_path}')
+            print(f'Checkpoint saved: {checkpoint_path}')'''
     
     # saving final checkpoint
     final_checkpoint_path = os.path.join(checkpoint_dir, 'word2vec_final_model.pt')
@@ -665,11 +641,11 @@ if __name__ == "__main__":
     NUM_EPOCHS = 15
     LEARNING_RATE = 0.02
     TRAIN_SPLIT = 0.8    
-    vocabulary_size = 8500
+    VOCABULARY_SIZE = 8500
 
     # Create dataset
     print("Creating dataset...")
-    dataset = Word2VecDataset(window_size=WINDOW_SIZE, vocabulary_size=vocabulary_size)
+    dataset = Word2VecDataset(window_size=WINDOW_SIZE, vocabulary_size=VOCABULARY_SIZE)
         
 
     # Split dataset into training and validation
