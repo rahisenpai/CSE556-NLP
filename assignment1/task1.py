@@ -11,16 +11,11 @@ class WordPieceTokenizer:
         self.split_words = []  # To store the current state of split words
         
     def preprocess_data(self, text: str) -> str:
-        # Convert to lowercase (this corpus does not need this part of pre-processing)
-        text = text.lower()
-        
-        # Add spaces around punctuation
-        text = re.sub(r'([.,!?()])', r' \1 ', text)
-        
-        # Remove multiple spaces
-        text = re.sub(r'\s+', ' ', text)
-        
-        return text.strip() # Only this part of pre-processing is needed for this corpus
+        """ Preprocess input text """       
+        # Remove specific words and everything after (img, http, href, src)
+        text = re.sub(r'\b(img|http|href|src)\b.*', '', text)
+
+        return text.strip()  # for spaces
     
     def split_word(self, word: str) -> List[str]:
         """ Split word into characters, adding ## prefix to non-initial characters """
@@ -89,6 +84,7 @@ class WordPieceTokenizer:
         # Read and preprocess corpus
         corpus = self.read_corpus(corpus_file)
         processed_texts = [self.preprocess_data(text) for text in corpus]
+        # print(processed_texts[21])
         
         # Split all words into characters with ## prefix
         self.split_words = []
