@@ -12,10 +12,10 @@ class WordPieceTokenizer:
         
     def preprocess_data(self, text: str) -> str:
         """ Preprocess input text """       
-        # Remove specific words (img, http, href, src)
+        # Remove specific words and everything after (img, http, href, src)
         text = re.sub(r'\b(img|http|href|src)\b.*', '', text)
 
-        return text.strip()  # Only this part of pre-processing is needed for this corpus
+        return text.strip()  # for spaces
     
     def split_word(self, word: str) -> List[str]:
         """ Split word into characters, adding ## prefix to non-initial characters """
