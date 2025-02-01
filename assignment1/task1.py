@@ -1,7 +1,9 @@
 import json
 from collections import defaultdict
 import re
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Tuple
+import pickle
+
 
 class WordPieceTokenizer:
     def __init__(self):
@@ -123,7 +125,7 @@ class WordPieceTokenizer:
             self.split_words = self.merge_pair(best_pair, self.split_words)
         
         # Save vocabulary to file
-        with open('vocabulary_35.txt', 'w', encoding='utf-8') as f:
+        with open('task1-files/vocabulary_35.txt', 'w', encoding='utf-8') as f:
             for token in sorted(self.vocab):
                 f.write(f"{token}\n")
     
@@ -179,12 +181,16 @@ class WordPieceTokenizer:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2)
 
-# Example usage
+
 if __name__ == "__main__":
     tokenizer = WordPieceTokenizer()
-    
+
     # Construct vocabulary from corpus.txt file
-    tokenizer.construct_vocabulary("corpus.txt", vocab_size=5000)
-    
+    tokenizer.construct_vocabulary("corpus.txt", vocab_size=8500)
+
     # Tokenize test file
-    tokenizer.tokenize_file("sample_test.json", "tokenized_35.json")
+    tokenizer.tokenize_file("task1-files/sample_test.json", "task1-files/tokenized_35.json")
+
+    #save tokenizer object
+    # with open('task1-files/tokenizer.pkl', 'wb') as f:
+    #     pickle.dump(tokenizer, f)

@@ -24,8 +24,6 @@
 # 3. Develop a function named train to manage the entire training process of the Word2Vec model. This
 # function should include all the training logic.
 
-# In[2]:
-
 
 import torch
 import torch.nn as nn
@@ -34,40 +32,18 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
 import json
-import os
 import matplotlib.pyplot as plt
-
 from datetime import datetime
 from tqdm import tqdm
-
-import sys
 import os
-
-
-# In[3]:
-
-
-sys.path.append(os.path.abspath('../Task 1'))
-
-print(os.getcwd())
-
-# changing directories to get the WordPieceTokenizer class from task1
-os.chdir('../Task1')
-
-print(os.getcwd())
 
 from task1 import WordPieceTokenizer
 
 tokenizer = WordPieceTokenizer()
 
-os.chdir('../Task2')
-
-print(os.getcwd())
-
 
 # ## Word2VecDataset Class
 
-# In[4]:
 
 
 # Word2VecDataset(Dataset) => inherits from the Dataset class of Pytorch
@@ -107,7 +83,7 @@ class Word2VecDataset(Dataset):
         
         results = {}
         
-        for idx, line in lines:
+        for idx, line in enumerate(lines):
             sentence = line.strip() 
             tokens = self.tokenizer.tokenize(sentence)
             results[str(idx)] = tokens 
@@ -124,7 +100,7 @@ class Word2VecDataset(Dataset):
 
         vocabulary = []
 
-        with open('vocabulary_35.txt', 'r') as file:
+        with open('task1-files/vocabulary_35.txt', 'r') as file:
             
             for line in file:
                 word = line.strip()
@@ -137,11 +113,11 @@ class Word2VecDataset(Dataset):
     
     def tokenize_corpus(self):
         
-        self.tokenize_txt_file("corpus.txt", "tokenized_corpus.json")
+        self.tokenize_txt_file("corpus.txt", "task2-files/tokenized_corpus.json")
 
         corpus = None
 
-        with open('tokenized_corpus.json', 'r', encoding='utf-8') as f:
+        with open('task2-files/tokenized_corpus.json', 'r', encoding='utf-8') as f:
 
             tokenized_corpus = json.load(f)
             # convert to list
@@ -219,7 +195,6 @@ class Word2VecDataset(Dataset):
 
 # ## Word2VecModel class
 
-# In[5]:
 
 
 # Word2VecModel(nn.Module) => Inherits from nn.Module class in Pytorch
@@ -330,7 +305,6 @@ class Word2VecModel(nn.Module):
 
 # ## Functions for saving and loading checkpoints
 
-# In[6]:
 
 
 def save_checkpoint(model, checkpoint_path, epoch, optimizer, loss, accuracy):
@@ -370,7 +344,6 @@ def load_checkpoint(model, checkpoint_path, device: str = 'cuda' if torch.cuda.i
 
 # ## Training Function
 
-# In[32]:
 
 
 def train_word2vec(model,train_loader,val_loader,num_epochs,learning_rate,
@@ -478,7 +451,6 @@ def train_word2vec(model,train_loader,val_loader,num_epochs,learning_rate,
 
 # ## Evaluation Functions
 
-# In[35]:
 
 
 def validate_model(model, val_loader, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
@@ -589,7 +561,6 @@ def plot_training_history(history):
 
 # ## Saving Model
 
-# In[29]:
 
 
 def save_model(final_model_dir, model, val_loss, accuracy):
@@ -617,7 +588,6 @@ def save_vocabulary(final_model_dir, dataset):
 
 # ## Main Function
 
-# In[10]:
 
 
 WINDOW_SIZE = 4
@@ -629,7 +599,6 @@ TRAIN_SPLIT = 0.8
 VOCAB_SIZE = 8500
 
 
-# In[13]:
 
 
 # Create dataset
@@ -638,7 +607,6 @@ dataset = Word2VecDataset(window_size=WINDOW_SIZE, vocabulary_size=VOCAB_SIZE)
     
 
 
-# In[36]:
 
 
 # Split dataset into training and validation
@@ -648,7 +616,6 @@ train_dataset, val_dataset = torch.utils.data.random_split(
         dataset, [train_size, val_size])
 
 
-# In[37]:
 
 
 # Create data loaders
@@ -657,7 +624,6 @@ val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
     
 
 
-# In[38]:
 
 
 # Print dataset information
@@ -669,7 +635,6 @@ print("\nSample vocabulary items:", list(dataset.vocabulary)[:5])
     
 
 
-# In[43]:
 
 
 # model initialization
@@ -679,7 +644,6 @@ model = Word2VecModel(vocab_size=len(dataset.vocabulary), embedding_dim=EMBEDDIN
     
 
 
-# In[44]:
 
 
 # training model
@@ -691,14 +655,13 @@ history = train_word2vec(
         val_loader=val_loader,
         num_epochs=NUM_EPOCHS,
         learning_rate=LEARNING_RATE,
-        checkpoint_dir='word2vec_checkpoints',
+        checkpoint_dir='task2-files/word2vec_checkpoints',
         save_frequency=2,
         device=device
 )
     
 
 
-# In[45]:
 
 
 # Validate model and get accuracy
@@ -709,7 +672,6 @@ print(f"Validation Accuracy: {accuracy:.2f}%")
     
 
 
-# In[46]:
 
 
 # Plot training history
@@ -717,7 +679,6 @@ plot_training_history(history)
     
 
 
-# In[47]:
 
 
 # Print validation pairs and predictions
@@ -728,12 +689,11 @@ evaluate_model(model, val_loader, device, dataset, BATCH_SIZE)
     
 
 
-# In[48]:
 
 
 # Save final model and vocabulary
 
-final_model_dir = 'final_model'
+final_model_dir = 'task2-files/final_model'
 
 os.makedirs(final_model_dir, exist_ok=True)
     
@@ -743,7 +703,6 @@ save_model(final_model_dir, model, val_loss, accuracy)
 
 # ## Cosine Similarity Triplets Part
 
-# In[49]:
 
 
 # function to get triplets
@@ -768,7 +727,6 @@ def find_triplets(model: Word2VecModel, num_triplets: int = 2):
 
 
 
-# In[54]:
 
 
 triplets = find_triplets(model)
