@@ -586,119 +586,6 @@ def save_vocabulary(final_model_dir, dataset):
         json.dump(vocab_data, f)
 
 
-# ## Main Function
-
-
-
-WINDOW_SIZE = 4
-EMBEDDING_DIM = 10
-BATCH_SIZE = 256
-NUM_EPOCHS = 15
-LEARNING_RATE = 0.02
-TRAIN_SPLIT = 0.8    
-VOCAB_SIZE = 8500
-
-
-
-
-# Create dataset
-print("Creating dataset...")
-dataset = Word2VecDataset(window_size=WINDOW_SIZE, vocabulary_size=VOCAB_SIZE)
-    
-
-
-
-
-# Split dataset into training and validation
-train_size = int(TRAIN_SPLIT * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(
-        dataset, [train_size, val_size])
-
-
-
-
-# Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    
-
-
-
-
-# Print dataset information
-print(f"\nVocabulary Size: {len(dataset.vocabulary)}")
-print(f"Total Pairs: {len(dataset)}")
-print(f"Training Pairs: {len(train_dataset)}")
-print(f"Validation Pairs: {len(val_dataset)}")
-print("\nSample vocabulary items:", list(dataset.vocabulary)[:5])
-    
-
-
-
-
-# model initialization
-print("Initializing model...")
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Word2VecModel(vocab_size=len(dataset.vocabulary), embedding_dim=EMBEDDING_DIM).to(device)
-    
-
-
-
-
-# training model
-print("\nStarting training...")
-
-history = train_word2vec(
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        num_epochs=NUM_EPOCHS,
-        learning_rate=LEARNING_RATE,
-        checkpoint_dir='task2-files/word2vec_checkpoints',
-        save_frequency=2,
-        device=device
-)
-    
-
-
-
-
-# Validate model and get accuracy
-print("\nValidating model...")
-val_loss, accuracy, avg_cosine = validate_model(model, val_loader, device)
-print(f"Validation Loss: {val_loss:.4f}")
-print(f"Validation Accuracy: {accuracy:.2f}%")
-    
-
-
-
-
-# Plot training history
-plot_training_history(history)
-    
-
-
-
-
-# Print validation pairs and predictions
-print("\nValidation Pairs vs Predictions:")
-print("-" * 50)
-
-evaluate_model(model, val_loader, device, dataset, BATCH_SIZE)
-    
-
-
-
-
-# Save final model and vocabulary
-
-final_model_dir = 'task2-files/final_model'
-
-os.makedirs(final_model_dir, exist_ok=True)
-    
-save_vocabulary(final_model_dir, dataset)
-save_model(final_model_dir, model, val_loss, accuracy)
 
 
 # ## Cosine Similarity Triplets Part
@@ -728,19 +615,102 @@ def find_triplets(model: Word2VecModel, num_triplets: int = 2):
 
 
 
+if __name__ == "__main__":
+    # ## Main Function
+    WINDOW_SIZE = 4
+    EMBEDDING_DIM = 10
+    BATCH_SIZE = 256
+    NUM_EPOCHS = 15
+    LEARNING_RATE = 0.02
+    TRAIN_SPLIT = 0.8    
+    VOCAB_SIZE = 8500
 
-triplets = find_triplets(model)
+    # Create dataset
+    print("Creating dataset...")
+    dataset = Word2VecDataset(window_size=WINDOW_SIZE, vocabulary_size=VOCAB_SIZE)
+        
 
-print("Identified Triplets:")
+    # Split dataset into training and validation
+    train_size = int(TRAIN_SPLIT * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = torch.utils.data.random_split(
+            dataset, [train_size, val_size])
 
-for triplet in triplets:
-    print(f"\nToken - {triplet[0]}\nSimilar tokens - {triplet[1]}, {triplet[2]}\nDissimilar token - {triplet[3]}")
+    # Create data loaders
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+        
 
-    sim1 = model.cosine_similarity(triplet[0], triplet[1])
-    sim2 = model.cosine_similarity(triplet[0], triplet[2])
-    sim3 = model.cosine_similarity(triplet[0], triplet[3])
+    # Print dataset information
+    print(f"\nVocabulary Size: {len(dataset.vocabulary)}")
+    print(f"Total Pairs: {len(dataset)}")
+    print(f"Training Pairs: {len(train_dataset)}")
+    print(f"Validation Pairs: {len(val_dataset)}")
+    print("\nSample vocabulary items:", list(dataset.vocabulary)[:5])
+        
 
-    print(f"Cosine similarity ({triplet[0]}, {triplet[1]}): {sim1}")
-    print(f"Cosine similarity ({triplet[0]}, {triplet[2]}): {sim2}")
-    print(f"Cosine similarity ({triplet[0]}, {triplet[3]}): {sim3}")
+    # model initialization
+    print("Initializing model...")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = Word2VecModel(vocab_size=len(dataset.vocabulary), embedding_dim=EMBEDDING_DIM).to(device)
+        
 
+    # training model
+    print("\nStarting training...")
+
+    history = train_word2vec(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            num_epochs=NUM_EPOCHS,
+            learning_rate=LEARNING_RATE,
+            checkpoint_dir='task2-files/word2vec_checkpoints',
+            save_frequency=2,
+            device=device
+    )
+        
+
+    # Validate model and get accuracy
+    print("\nValidating model...")
+    val_loss, accuracy, avg_cosine = validate_model(model, val_loader, device)
+    print(f"Validation Loss: {val_loss:.4f}")
+    print(f"Validation Accuracy: {accuracy:.2f}%")
+        
+
+    # Plot training history
+    plot_training_history(history)
+        
+
+    # Print validation pairs and predictions
+    print("\nValidation Pairs vs Predictions:")
+    print("-" * 50)
+
+    evaluate_model(model, val_loader, device, dataset, BATCH_SIZE)
+        
+
+    # Save final model and vocabulary
+
+    final_model_dir = 'task2-files/final_model'
+
+    os.makedirs(final_model_dir, exist_ok=True)
+        
+    save_vocabulary(final_model_dir, dataset)
+    save_model(final_model_dir, model, val_loss, accuracy)
+
+
+
+
+    triplets = find_triplets(model)
+
+    print("Identified Triplets:")
+
+    for triplet in triplets:
+        print(f"\nToken - {triplet[0]}\nSimilar tokens - {triplet[1]}, {triplet[2]}\nDissimilar token - {triplet[3]}")
+
+        sim1 = model.cosine_similarity(triplet[0], triplet[1])
+        sim2 = model.cosine_similarity(triplet[0], triplet[2])
+        sim3 = model.cosine_similarity(triplet[0], triplet[3])
+
+        print(f"Cosine similarity ({triplet[0]}, {triplet[1]}): {sim1}")
+        print(f"Cosine similarity ({triplet[0]}, {triplet[2]}): {sim2}")
+        print(f"Cosine similarity ({triplet[0]}, {triplet[3]}): {sim3}")
