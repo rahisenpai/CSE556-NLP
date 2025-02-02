@@ -66,8 +66,8 @@ class NeuralLMDataset(Dataset):
         """
         # self.tokenizer.construct_vocabulary(corpus_path, vocab_size=vocab_size)
         # self.tokenize_txt_file(corpus_path, "task3-files/tokenized_corpus.json")
-
-        with open("task2-files/tokenized_corpus.json", 'r', encoding='utf-8') as f: #update before submission
+        #for evaluation purposes
+        with open("task3-files/tokenized_corpus.json", 'r', encoding='utf-8') as f:
             tokenized_corpus = json.load(f)
             self.tokenized_sentences = [tokens for tokens in tokenized_corpus.values()] #list of tokenized sentences
 
@@ -86,7 +86,7 @@ class NeuralLMDataset(Dataset):
                 else: #enough context tokens
                     context_idx = [self.word2idx[token] for token in sentence[i-self.context_size:i]]
                 #get embeddings for context tokens
-                context_embed = [self.word2vec.embeddings(torch.tensor(idx, dtype=torch.long)).detach().numpy() for idx in context_idx]
+                context_embed = [self.word2vec.embeddings(torch.tensor(idx, dtype=torch.long).to(self.word2vec.embeddings.weight.device)).detach().cpu().numpy() for idx in context_idx]
                 target_idx = self.word2idx[sentence[i]] #target token index
                 data.append((context_embed, target_idx))
         return data
@@ -109,7 +109,7 @@ class NeuralLMDataset(Dataset):
 
 class NeuralLM1(nn.Module):
     """
-    Implements a simple neural language model with 1 hidden layer
+    Implements a simple neural language model with 1 hidden layer (1024)
     and a Tanh activation function for next-word prediction task.
     """
     def __init__(self, input_dim, hidden_dim, vocab_size):
@@ -132,8 +132,8 @@ class NeuralLM1(nn.Module):
 
 class NeuralLM2(nn.Module):
     """
-    Implements a neural language model with 1 hidden layer and a Tanh activation
-    function alongisde skip-connection for next-word prediction task.
+    Implements a neural language model with 1 hidden layer (1024) and a ReLU 
+    activation function alongisde skip-connection for next-word prediction task.
     """
     def __init__(self, input_dim, hidden_dim, vocab_size):
         """
@@ -159,8 +159,8 @@ class NeuralLM2(nn.Module):
 
 class NeuralLM3(nn.Module):
     """
-    Implements a complex neural language model with 3 hidden layer and ReLU activations
-    function alongisde normalization and dropout for next-word prediction task.
+    Implements a neural language model with 2 hidden layers [512,2048]
+    and ReLU activations function for next-word prediction task.
     """
     def __init__(self, input_dim, hidden_dim, vocab_size):
         """
@@ -169,18 +169,10 @@ class NeuralLM3(nn.Module):
         super(NeuralLM3, self).__init__()
         self.architecture = nn.Sequential(
             nn.Linear(input_dim, hidden_dim[0]),
-            nn.BatchNorm1d(hidden_dim[0]),
             nn.ReLU(),
-            nn.Dropout(0.3),
             nn.Linear(hidden_dim[0], hidden_dim[1]),
-            nn.BatchNorm1d(hidden_dim[1]),
             nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(hidden_dim[1], hidden_dim[2]),
-            nn.BatchNorm1d(hidden_dim[2]),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(hidden_dim[2], vocab_size)
+            nn.Linear(hidden_dim[1], vocab_size)
         )
     
     def forward(self, x):
@@ -290,18 +282,18 @@ def predict_tokens(sentence: str, num_tokens: int, context_size: int, dataset: N
         tokens = [dataset.pad_token] * (context_size - len(tokens)) + tokens
 
     #get embeddings for tokenized sentence
-    sentence_embeds = [dataset.word2vec.embeddings(torch.tensor(dataset.word2idx[token], dtype=torch.long)).detach().numpy() for token in tokens]
+    sentence_embeds = [dataset.word2vec.embeddings(torch.tensor(dataset.word2idx[token], dtype=torch.long).to(dataset.word2vec.embeddings.weight.device)).detach().cpu().numpy() for token in tokens]
 
     predicted_tokens = []
     for _ in range(num_tokens):
         context = sentence_embeds[-context_size:] #select previous context_size tokens for prediction
-        context_tensor = torch.tensor(np.concatenate(context).flatten(), dtype=torch.float32)
+        context_tensor = torch.tensor(np.concatenate(context).flatten(), dtype=torch.float32).to(dataset.word2vec.embeddings.weight.device)
         output = model(context_tensor)
         predicted_idx = torch.argmax(output).item()
         predicted_token = dataset.idx2word[predicted_idx]
         #append the new token and its embedding to the lists
         predicted_tokens.append(predicted_token)
-        sentence_embeds.append(dataset.word2vec.embeddings(torch.tensor(predicted_idx, dtype=torch.long)).detach().numpy())
+        sentence_embeds.append(dataset.word2vec.embeddings(torch.tensor(predicted_idx, dtype=torch.long).to(dataset.word2vec.embeddings.weight.device)).detach().cpu().numpy())
 
     return predicted_tokens
 
@@ -320,14 +312,48 @@ def prediciton_pipeline(input_file: str, num_tokens: int, context_size: int, dat
         print(f"Predicted Tokens: {' '.join(predicted_tokens)}")
 
 
-def load_model(model_class):
-    model_path = "task2-files/final_model/final_model.pt"
-    checkpoint = torch.load(model_path)
-    model = model_class(vocab_size=checkpoint['vocab_size'], embedding_dim=checkpoint['embedding_dim'])
+def load_Word2Vec(path: str, model_class: Word2VecModel, device: str) -> Tuple[Word2VecModel, float, float]:
+    """
+    Returns the trained Word2Vec model given the modek path.
+    """
+    checkpoint = torch.load(path, map_location=torch.device(device))
+    model = model_class(vocabulary_size=checkpoint['vocabulary_size'], embedding_dim=checkpoint['embedding_dim'])
     model.load_state_dict(checkpoint['model_state_dict'])
     val_loss = checkpoint['val_loss']
     val_accuracy = checkpoint['val_accuracy']
     return model, val_loss, val_accuracy
+
+def save_model(model: NeuralLM1 | NeuralLM2 | NeuralLM3, train_loss: List[float], val_loss: List[float],
+               train_acc: List[float], val_acc: List[float], train_ppl: List[np.float64], val_ppl: List[np.float64],
+               save_path: str) -> None:
+    """
+    Saves the model state and training statistics.
+    """
+    checkpoint = {
+        'model_state_dict': model.state_dict(),
+        'train_loss': train_loss,
+        'val_loss': val_loss,
+        'train_acc': train_acc,
+        'val_acc': val_acc,
+        'train_ppl': train_ppl,
+        'val_ppl': val_ppl
+    }
+    torch.save(checkpoint, save_path)
+
+def load_model(model: NeuralLM1 | NeuralLM2 | NeuralLM3, model_path: str):
+    """
+    Loads the trained neural model and relevant stats.
+    """
+    checkpoint = torch.load(model_path, weights_only=False)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    train_loss = checkpoint['train_loss']
+    val_loss = checkpoint['val_loss']
+    train_acc = checkpoint['train_acc']
+    val_acc = checkpoint['val_acc']
+    train_ppl = checkpoint['train_ppl']
+    val_ppl = checkpoint['val_ppl']
+    return train_loss, train_acc, train_ppl, val_loss, val_acc, val_ppl
+
 
 if __name__ == '__main__':
     #configuration variables
@@ -335,47 +361,72 @@ if __name__ == '__main__':
     PAD_TOKEN = '[PAD]'
     VOCAB_SIZE = 8500
     CONTEXT_SIZE = 4
-    NUM_EPOCHS = 1
-    LEARNING_RATE = 0.02
+    NUM_EPOCHS = 5
+    LEARNING_RATE = 0.01
     BATCH_SIZE = 1024
     TRAIN_SPLIT = 0.8
-    PLOT_SAVE_PATH = "task3-files/"
+    SAVE_PATH = "task3-files/"
     PREDICT_NUM_TOKENS = 3
+    SEED = 42
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     #create tokenizer object and load trained word2vec model
     # Tokenizer = WordPieceTokenizer()
-    Tokenizer = pickle.load(open("task1-files/tokenizer.pkl", 'rb')) #update before submission
-    Word2Vec, val_loss, val_accuracy = load_model(Word2VecModel)
+    Tokenizer = pickle.load(open("task1-files/tokenizer.pkl", 'rb')) #for evaluation purposes
+    Word2Vec, W2C_val_loss, W2C_val_acc = load_Word2Vec(path="task2-files/final_model/final_model.pt", model_class=Word2VecModel, device=DEVICE)
+    Word2Vec.to(DEVICE)
 
     #create dataset and split into training and valdiaiton
     dataset = NeuralLMDataset(corpus_path=CORPUS_PATH, pad_token=PAD_TOKEN, vocab_size=VOCAB_SIZE,
                               tokenizer=Tokenizer, word2vec=Word2Vec, context_size=CONTEXT_SIZE)
     train_dataset, val_dataset = torch.utils.data.random_split(dataset=dataset, lengths=[TRAIN_SPLIT, 1-TRAIN_SPLIT],
-                                                               generator=torch.Generator().manual_seed(42))
+                                                               generator=torch.Generator().manual_seed(SEED))
 
-    #create dataloaders for training set and validation set
-    train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    # #create dataloaders for training set and validation set
+    # train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    # val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    #create model instances and train
+    # #create model instances and train
     # model1 = NeuralLM1(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
     # train_losses_1, train_accuracies_1, train_preplexity_1, val_losses_1, val_accuracies_1, val_preplexity_1 = train(
     #     model=model1, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
 
-    model2 = NeuralLM2(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
-    train_losses_2, train_accuracies_2, train_preplexity_2, val_losses_2, val_accuracies_2, val_preplexity_2 = train(
-        model=model2, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
+    # model2 = NeuralLM2(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
+    # train_losses_2, train_accuracies_2, train_preplexity_2, val_losses_2, val_accuracies_2, val_preplexity_2 = train(
+    #     model=model2, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
 
-    # model3 = NeuralLM3(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=[256,1024,4096], vocab_size=VOCAB_SIZE)
+    # model3 = NeuralLM3(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=[512,2048], vocab_size=VOCAB_SIZE)
     # train_losses_3, train_accuracies_3, train_preplexity_3, val_losses_3, val_accuracies_3, val_preplexity_3 = train(
     #     model=model3, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
 
-    #plot losses
-    # plot_losses(train_loss=train_losses_1, val_loss=val_losses_1, model='NeuralLM1', save_path=PLOT_SAVE_PATH)
-    # plot_losses(train_loss=train_losses_2, val_loss=val_losses_2, model='NeuralLM2', save_path=PLOT_SAVE_PATH)
-    # plot_losses(train_loss=train_losses_3, val_loss=val_losses_3, model='NeuralLM3', save_path=PLOT_SAVE_PATH)
+    # #plot losses and save models
+    # plot_losses(train_loss=train_losses_1, val_loss=val_losses_1, model='NeuralLM1', save_path=SAVE_PATH)
+    # save_model(model=model1, train_loss=train_losses_1, val_loss=val_losses_1, train_acc=train_accuracies_1, val_acc=val_accuracies_1,
+    #            train_ppl=train_preplexity_1, val_ppl=val_preplexity_1, save_path=SAVE_PATH+'NeuralLM1.pth')
+    # plot_losses(train_loss=train_losses_2, val_loss=val_losses_2, model='NeuralLM2', save_path=SAVE_PATH)
+    # save_model(model=model2, train_loss=train_losses_2, val_loss=val_losses_2, train_acc=train_accuracies_2, val_acc=val_accuracies_2,
+    #            train_ppl=train_preplexity_2, val_ppl=val_preplexity_2, save_path=SAVE_PATH+'NeuralLM2.pth')
+    # plot_losses(train_loss=train_losses_3, val_loss=val_losses_3, model='NeuralLM3', save_path=SAVE_PATH)
+    # save_model(model=model3, train_loss=train_losses_3, val_loss=val_losses_3, train_acc=train_accuracies_3, val_acc=val_accuracies_3,
+    #            train_ppl=train_preplexity_3, val_ppl=val_preplexity_3, save_path=SAVE_PATH+'NeuralLM3.pth')
+
+    #load models for prediction tasks
+    model1 = NeuralLM1(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
+    train_losses_1, train_accuracies_1, train_preplexity_1, val_losses_1, val_accuracies_1, val_preplexity_1 = load_model(
+        model=model1, model_path=SAVE_PATH+'NeuralLM1.pth')
+    model2 = NeuralLM2(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
+    train_losses_2, train_accuracies_2, train_preplexity_2, val_losses_2, val_accuracies_2, val_preplexity_2 = load_model(
+        model=model2, model_path=SAVE_PATH+'NeuralLM2.pth')
+    model3 = NeuralLM3(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=[512,2048], vocab_size=VOCAB_SIZE)
+    train_losses_3, train_accuracies_3, train_preplexity_3, val_losses_3, val_accuracies_3, val_preplexity_3 = load_model(
+        model=model3, model_path=SAVE_PATH+'NeuralLM3.pth')
 
     #use prediction pipeline to predict next tokens for each sentence in a text file
-    # prediciton_pipeline(input_file='task3-files/sample_test.txt', num_tokens=PREDICT_NUM_TOKENS,
-    #                     context_size=CONTEXT_SIZE, dataset=dataset, model=model1, device=DEVICE)
+    prediciton_pipeline(input_file='task3-files/sample_test.txt', num_tokens=PREDICT_NUM_TOKENS,
+                        context_size=CONTEXT_SIZE, dataset=dataset, model=model1, device=DEVICE)
+    prediciton_pipeline(input_file='task3-files/sample_test.txt', num_tokens=PREDICT_NUM_TOKENS,
+                        context_size=CONTEXT_SIZE, dataset=dataset, model=model2, device=DEVICE)
+    prediciton_pipeline(input_file='task3-files/sample_test.txt', num_tokens=PREDICT_NUM_TOKENS,
+                        context_size=CONTEXT_SIZE, dataset=dataset, model=model3, device=DEVICE)
