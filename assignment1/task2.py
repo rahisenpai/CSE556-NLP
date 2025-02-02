@@ -12,7 +12,10 @@ import os
 
 from task1 import WordPieceTokenizer
 
- 
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+
+
 '''Word2VecDataset Class'''
 class Word2VecDataset(Dataset):
     
@@ -630,11 +633,8 @@ def find_triplets(model: Word2VecModel, num_triplets: int = 2):
     
     return triplets
 
-
-
-
 if __name__ == "__main__":
-   
+
     WINDOW_SIZE = 4
     EMBEDDING_DIM = 10
     BATCH_SIZE = 256
