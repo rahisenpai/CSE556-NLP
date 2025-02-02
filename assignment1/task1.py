@@ -11,7 +11,11 @@ class WordPieceTokenizer:
         self.split_words = []  # To store the current state of split words
         
     def preprocess_data(self, text: str) -> str:
-        """ Preprocess input text """       
+        """ 
+        Preprocess input text by:
+        - Removing words like 'img', 'http', 'href', 'src' and everything after them
+        - Stripping extra spaces
+        """
         # Remove specific words and everything after (img, http, href, src)
         text = re.sub(r'\b(img|http|href|src)\b.*', '', text)
 
@@ -19,7 +23,7 @@ class WordPieceTokenizer:
     
     def split_word(self, word: str) -> List[str]:
         """ Split word into characters, adding ## prefix to non-initial characters """
-        # similar to BPE Algorithm
+        # WordPiece style splitting (similar to BPE Algorithm)
         if not word:
             return []
         chars = list(word)
@@ -53,7 +57,11 @@ class WordPieceTokenizer:
         return scores
     
     def merge_pair(self, pair: Tuple[str, str], split_words: List[List[str]]) -> List[List[str]]:
-        """ Merge the specified pair in all occurrences in the split words """
+        """ 
+        Merge the given subword pair in all words:
+        - Locate adjacent occurrences of the pair in split words
+        - Replace them with the merged token
+        """
         first, second = pair
         merged = first + second.replace("##", "")
         
@@ -78,8 +86,12 @@ class WordPieceTokenizer:
             return f.readlines()
 
     def construct_vocabulary(self, corpus_file: str, vocab_size: int) -> None:
-        """
-        Construct vocabulary using WordPiece algorithm using the specified scoring method
+        """ 
+        Construct vocabulary using WordPiece algorithm:
+        - Read and preprocess the corpus
+        - Convert words into character-level subwords
+        - Iteratively merge the most frequent subword pairs until reaching vocab_size using the scoring method
+        - Save the vocabulary to a file 
         """
         # Read and preprocess corpus
         corpus = self.read_corpus(corpus_file)
@@ -126,7 +138,13 @@ class WordPieceTokenizer:
                 f.write(f"{token}\n")
     
     def tokenize(self, text: str) -> List[str]:
-        """ Tokenize input text using the constructed vocabulary """
+        """ 
+        Tokenize input text:
+        - Preprocess the text
+        - Convert each word into subwords
+        - Merge the longest matching subwords found in the vocabulary
+        - If no match is found, mark it as [UNK]
+        """
         text = self.preprocess_data(text)
         result = []
         
@@ -163,7 +181,12 @@ class WordPieceTokenizer:
         return result
     
     def tokenize_file(self, input_file: str, output_file: str) -> None:
-        """Tokenize sentences from input JSON file and save results"""
+        """ 
+        Read a JSON file containing sentences, tokenize each sentence, and save the results:
+        - Read input JSON containing sentence IDs and text
+        - Tokenize each sentence using WordPiece
+        - Store results in JSON format with tokenized output
+        """
         with open(input_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
