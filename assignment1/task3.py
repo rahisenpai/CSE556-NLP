@@ -64,8 +64,8 @@ class NeuralLMDataset(Dataset):
         where context_embed is the embeddings of the previous context_size tokens provided by Word2VecModel 
         and target_idx is the index of the word that should come after the context words.
         """
-        # self.tokenizer.construct_vocabulary(corpus_path, vocab_size=vocab_size)
-        # self.tokenize_txt_file(corpus_path, "task3-files/tokenized_corpus.json")
+        self.tokenizer.construct_vocabulary(corpus_path, vocab_size=vocab_size)
+        self.tokenize_txt_file(corpus_path, "task3-files/tokenized_corpus.json")
         #for evaluation purposes
         with open("task3-files/tokenized_corpus.json", 'r', encoding='utf-8') as f:
             tokenized_corpus = json.load(f)
@@ -373,8 +373,8 @@ if __name__ == '__main__':
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     #create tokenizer object and load trained word2vec model
-    # Tokenizer = WordPieceTokenizer()
-    Tokenizer = pickle.load(open("task1-files/tokenizer.pkl", 'rb')) #for evaluation purposes
+    Tokenizer = WordPieceTokenizer()
+    # Tokenizer = pickle.load(open("task1-files/tokenizer.pkl", 'rb')) #for evaluation purposes
     Word2Vec, W2C_val_loss, W2C_val_acc = load_Word2Vec(path="task2-files/final_model/final_model.pt", model_class=Word2VecModel, device=DEVICE)
     Word2Vec.to(DEVICE)
 
@@ -384,33 +384,33 @@ if __name__ == '__main__':
     train_dataset, val_dataset = torch.utils.data.random_split(dataset=dataset, lengths=[TRAIN_SPLIT, 1-TRAIN_SPLIT],
                                                                generator=torch.Generator().manual_seed(SEED))
 
-    # #create dataloaders for training set and validation set
-    # train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    # val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    #create dataloaders for training set and validation set
+    train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    # #create model instances and train
-    # model1 = NeuralLM1(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
-    # train_losses_1, train_accuracies_1, train_preplexity_1, val_losses_1, val_accuracies_1, val_preplexity_1 = train(
-    #     model=model1, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
+    #create model instances and train
+    model1 = NeuralLM1(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
+    train_losses_1, train_accuracies_1, train_preplexity_1, val_losses_1, val_accuracies_1, val_preplexity_1 = train(
+        model=model1, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
 
-    # model2 = NeuralLM2(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
-    # train_losses_2, train_accuracies_2, train_preplexity_2, val_losses_2, val_accuracies_2, val_preplexity_2 = train(
-    #     model=model2, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
+    model2 = NeuralLM2(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
+    train_losses_2, train_accuracies_2, train_preplexity_2, val_losses_2, val_accuracies_2, val_preplexity_2 = train(
+        model=model2, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
 
-    # model3 = NeuralLM3(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=[512,2048], vocab_size=VOCAB_SIZE)
-    # train_losses_3, train_accuracies_3, train_preplexity_3, val_losses_3, val_accuracies_3, val_preplexity_3 = train(
-    #     model=model3, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
+    model3 = NeuralLM3(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=[512,2048], vocab_size=VOCAB_SIZE)
+    train_losses_3, train_accuracies_3, train_preplexity_3, val_losses_3, val_accuracies_3, val_preplexity_3 = train(
+        model=model3, train_dataloader=train_loader, val_dataloader=val_loader, epochs=NUM_EPOCHS, lr=LEARNING_RATE, device=DEVICE)
 
-    # #plot losses and save models
-    # plot_losses(train_loss=train_losses_1, val_loss=val_losses_1, model='NeuralLM1', save_path=SAVE_PATH)
-    # save_model(model=model1, train_loss=train_losses_1, val_loss=val_losses_1, train_acc=train_accuracies_1, val_acc=val_accuracies_1,
-    #            train_ppl=train_preplexity_1, val_ppl=val_preplexity_1, save_path=SAVE_PATH+'NeuralLM1.pth')
-    # plot_losses(train_loss=train_losses_2, val_loss=val_losses_2, model='NeuralLM2', save_path=SAVE_PATH)
-    # save_model(model=model2, train_loss=train_losses_2, val_loss=val_losses_2, train_acc=train_accuracies_2, val_acc=val_accuracies_2,
-    #            train_ppl=train_preplexity_2, val_ppl=val_preplexity_2, save_path=SAVE_PATH+'NeuralLM2.pth')
-    # plot_losses(train_loss=train_losses_3, val_loss=val_losses_3, model='NeuralLM3', save_path=SAVE_PATH)
-    # save_model(model=model3, train_loss=train_losses_3, val_loss=val_losses_3, train_acc=train_accuracies_3, val_acc=val_accuracies_3,
-    #            train_ppl=train_preplexity_3, val_ppl=val_preplexity_3, save_path=SAVE_PATH+'NeuralLM3.pth')
+    #plot losses and save models
+    plot_losses(train_loss=train_losses_1, val_loss=val_losses_1, model='NeuralLM1', save_path=SAVE_PATH)
+    save_model(model=model1, train_loss=train_losses_1, val_loss=val_losses_1, train_acc=train_accuracies_1, val_acc=val_accuracies_1,
+               train_ppl=train_preplexity_1, val_ppl=val_preplexity_1, save_path=SAVE_PATH+'NeuralLM1.pth')
+    plot_losses(train_loss=train_losses_2, val_loss=val_losses_2, model='NeuralLM2', save_path=SAVE_PATH)
+    save_model(model=model2, train_loss=train_losses_2, val_loss=val_losses_2, train_acc=train_accuracies_2, val_acc=val_accuracies_2,
+               train_ppl=train_preplexity_2, val_ppl=val_preplexity_2, save_path=SAVE_PATH+'NeuralLM2.pth')
+    plot_losses(train_loss=train_losses_3, val_loss=val_losses_3, model='NeuralLM3', save_path=SAVE_PATH)
+    save_model(model=model3, train_loss=train_losses_3, val_loss=val_losses_3, train_acc=train_accuracies_3, val_acc=val_accuracies_3,
+               train_ppl=train_preplexity_3, val_ppl=val_preplexity_3, save_path=SAVE_PATH+'NeuralLM3.pth')
 
     #load models for prediction tasks
     model1 = NeuralLM1(input_dim=Word2Vec.embedding_dim*CONTEXT_SIZE, hidden_dim=1024, vocab_size=VOCAB_SIZE)
