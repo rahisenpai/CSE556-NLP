@@ -1,1 +1,1 @@
-{"model_name": "GRU_FastText", "chunk_f1": 0.646112600536193, "tag_f1": 0.9457806767223808}
+{"model_name": "GRU_FastText", "chunk_f1": 0.6310013717421125, "tag_f1": 0.9449653485527925}
