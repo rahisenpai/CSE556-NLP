@@ -1,0 +1,3 @@
+[submodule "mental-health-counselling-summarization"]
+	path = project
+	url = https://github.com/rahisenpai/mental-health-counselling-summarization.git
